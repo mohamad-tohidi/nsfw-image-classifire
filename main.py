@@ -1,12 +1,11 @@
-from io import BytesIO
 from typing import Annotated
 from urllib.request import urlopen
 
 import timm
 import torch
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from PIL import Image, UnidentifiedImageError
+from fastapi import FastAPI, Form, HTTPException
+from PIL import Image
 from pydantic import HttpUrl
 
 app = FastAPI(title="NSFW Image Detection API")
@@ -41,32 +40,13 @@ async def root():
 
 @app.post("/predict")
 async def predict(
-    file: Annotated[UploadFile | None, File(None)] = None,
-    image_url: Annotated[HttpUrl | None, Form(None)] = None,
+    image_url: Annotated[HttpUrl | None, Form()] = None,
 ):
-    if file is None and image_url is None:
-        raise HTTPException(
-            status_code=400, detail="Provide either file or image_url"
-        )
+    if image_url is None:
+        raise HTTPException(status_code=400, detail="image_url is required")
 
-    if file is not None and image_url is not None:
-        raise HTTPException(
-            status_code=400, detail="Provide only one of file or image_url"
-        )
-
-    try:
-        if file is not None:
-            content = await file.read()
-            img = Image.open(BytesIO(content)).convert("RGB")
-        else:
-            img = Image.open(urlopen(str(image_url))).convert("RGB")
-
-        return predict_image(img)
-
-    except UnidentifiedImageError:
-        raise HTTPException(status_code=400, detail="Invalid image")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    img = Image.open(urlopen(str(image_url))).convert("RGB")
+    return predict_image(img)
 
 
 if __name__ == "__main__":
